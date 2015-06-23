@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.function.Consumer;
-
 import javax.imageio.ImageIO;
 import javax.media.opengl.DebugGL;
 import javax.media.opengl.GL;
@@ -21,12 +20,10 @@ import javax.media.opengl.GLCanvas;
 import javax.media.opengl.GLCapabilities;
 import javax.media.opengl.glu.GLU;
 import javax.swing.JOptionPane;
-
 import br.furb.bte.objetos.Arena;
 import br.furb.bte.objetos.Cor;
 import br.furb.bte.objetos.Moto;
 import br.furb.bte.objetos.Mundo;
-
 import com.sun.opengl.util.GLUT;
 import com.sun.opengl.util.j2d.TextRenderer;
 import com.sun.opengl.util.texture.TextureData;
@@ -46,6 +43,7 @@ public class Tela extends GLCanvas implements GLEventAdapter {
 		    if (animando || jogando || executandoPasso) {
 			//			System.out.println("Tela.RenderLoop.run()");
 			if (jogando) {
+			    fireGameplayEvent(l -> l.beforePlay());
 			    executarComportamentos();
 			}
 			glDrawable.display();
@@ -79,7 +77,9 @@ public class Tela extends GLCanvas implements GLEventAdapter {
     private GLAutoDrawable glDrawable;
     private boolean atualizarVisualizacao;
     private boolean perspectiveMode = true;
-    private final float[] posicaoLuz = { 50, 200, 50, 0 };
+    private final float[] posicaoLuz = { 25, 100, 25, 0.1f };
+    private final float[] direcaoLuz = { 0, 0, 0 };
+    private final float[] luzAmbiente = { 0.2f, 0.2f, 0.2f, 0.2f };
     // ========== OBJETOS GRÃ�FICOS ==========
     private Mundo mundo;
     private Moto moto1;
@@ -97,11 +97,11 @@ public class Tela extends GLCanvas implements GLEventAdapter {
     private final RenderLoop renderLoop;
 
     private int idTexture[];
-	private int width, height;
-	private BufferedImage image;
-	private TextureData td;
-	private ByteBuffer buffer;
-    
+    private int width, height;
+    private BufferedImage image;
+    private TextureData td;
+    private ByteBuffer buffer;
+
     public Tela(GLCapabilities capabilities) {
 	super(capabilities);
 	setPreferredSize(new Dimension(largura, altura));
@@ -142,29 +142,26 @@ public class Tela extends GLCanvas implements GLEventAdapter {
 	camera = new Camera(this);
 
 	// Habilita o modelo de colorização de Gouraud
-			gl.glShadeModel(GL.GL_SMOOTH);
+	gl.glShadeModel(GL.GL_SMOOTH);
 
-			// Comandos de inicialização para textura
-			// loadImage("madeira.jpg");
-			loadImage("data/teste.jpg");
+	// Comandos de inicialização para textura
+	// loadImage("madeira.jpg");
+	loadImage("data/teste.jpg");
 
-			// Gera identificador de textura
-			idTexture = new int[10];
-			gl.glGenTextures(1, idTexture, 1);
+	// Gera identificador de textura
+	idTexture = new int[10];
+	gl.glGenTextures(1, idTexture, 1);
 
-			// Especifica qual é a textura corrente pelo identificador
-			gl.glBindTexture(GL.GL_TEXTURE_2D, idTexture[0]);
+	// Especifica qual é a textura corrente pelo identificador
+	gl.glBindTexture(GL.GL_TEXTURE_2D, idTexture[0]);
 
-			// Envio da textura para OpenGL
-			gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, 3, width, height, 0, GL.GL_BGR,
-					GL.GL_UNSIGNED_BYTE, buffer);
+	// Envio da textura para OpenGL
+	gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, 3, width, height, 0, GL.GL_BGR, GL.GL_UNSIGNED_BYTE, buffer);
 
-			// Define os filtros de magnificação e minificação
-			gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER,
-					GL.GL_LINEAR);
-			gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER,
-					GL.GL_LINEAR);
-	
+	// Define os filtros de magnificação e minificação
+	gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR);
+	gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR);
+
 	addComponentListener(new ComponentAdapter() {
 
 	    @Override
@@ -181,24 +178,23 @@ public class Tela extends GLCanvas implements GLEventAdapter {
     }
 
     public void loadImage(String fileName) {
-		// Tenta carregar o arquivo
-		image = null;
-		try {
-			image = ImageIO.read(new File(fileName));
-		} catch (IOException e) {
-			JOptionPane.showMessageDialog(null, "Erro na leitura do arquivo "
-					+ fileName);
-		}
-
-		// Obtém largura e altura
-		width = image.getWidth();
-		height = image.getHeight();
-		// Gera uma nova TextureData...
-		td = new TextureData(0, 0, false, image);
-		// ...e obtém um ByteBuffer a partir dela
-		buffer = (ByteBuffer) td.getBuffer();
+	// Tenta carregar o arquivo
+	image = null;
+	try {
+	    image = ImageIO.read(new File(fileName));
+	} catch (IOException e) {
+	    JOptionPane.showMessageDialog(null, "Erro na leitura do arquivo " + fileName);
 	}
-    
+
+	// Obtém largura e altura
+	width = image.getWidth();
+	height = image.getHeight();
+	// Gera uma nova TextureData...
+	td = new TextureData(0, 0, false, image);
+	// ...e obtém um ByteBuffer a partir dela
+	buffer = (ByteBuffer) td.getBuffer();
+    }
+
     private void fireGameplayEvent(Consumer<GameplayListener> consumer) {
 	for (GameplayListener l : listeners) {
 	    consumer.accept(l);
@@ -218,8 +214,10 @@ public class Tela extends GLCanvas implements GLEventAdapter {
 	gl.glLoadIdentity();
 
 	gl.glLightfv(GL.GL_LIGHT0, GL.GL_POSITION, posicaoLuz, 0);
+	gl.glLightfv(GL.GL_LIGHT0, GL.GL_SPOT_DIRECTION, direcaoLuz, 0);
+	//	gl.glLightfv(GL.GL_LIGHT0, GL.GL_SPOT_EXPONENT, new float[] { 0 }, 0);
+	gl.glLightfv(GL.GL_LIGHT0, GL.GL_AMBIENT, luzAmbiente, 0);
 	gl.glEnable(GL.GL_LIGHT0);
-	gl.glEnable(GL.GL_LIGHT1);
 	gl.glEnable(GL.GL_LIGHTING);
 	gl.glShadeModel(GL.GL_SMOOTH);
     }
@@ -256,7 +254,7 @@ public class Tela extends GLCanvas implements GLEventAdapter {
 	// gl.glPopMatrix();
 	//
 	drawWalls();
-	
+
 	TEXT_RENDERER.beginRendering(largura, altura);
 	{
 	    TEXT_RENDERER.setColor(1, 1, 1, 1);
@@ -288,152 +286,172 @@ public class Tela extends GLCanvas implements GLEventAdapter {
 	}
 	gl.glPopMatrix();
     }
-    
+
     private void drawWalls() {
-		// Desenha um cubo no qual a textura é aplicada
-		gl.glEnable(GL.GL_TEXTURE_2D);	// Primeiro habilita uso de textura
-		gl.glColor3f(0.0f, 1.0f, 0.0f);
-		gl.glPushMatrix();
-			gl.glBegin(GL.GL_QUADS);
-				gl.glVertex3f(-500, 0f, +500);
-				gl.glVertex3f(-500, 0f, +550f);
-				gl.glVertex3f(+500, 0f, +550f);
-				gl.glVertex3f(+500, 0f, +500);
-				// face de cima
-				gl.glVertex3f(-500, 50f, +500);
-				gl.glVertex3f(-500, 50f, +550f);
-				gl.glVertex3f(+500, 50f, +550f);
-				gl.glVertex3f(+500, 50f, +500);
-				// face da frente
-				gl.glVertex3f(-500, 0f, +500);
-				gl.glVertex3f(-500, 50f, +500);
-				gl.glVertex3f(+500, 50f, +500);
-				gl.glVertex3f(+500, 0f, +500);
-				// face da traz
-				gl.glVertex3f(-500, 0f, +550f);
-				gl.glVertex3f(-500, 50f, +550f);
-				gl.glVertex3f(+500, 50f, +550f);
-				gl.glVertex3f(+500, 0f, +550f);
-				// face lateral esquerda
-				gl.glVertex3f(-500, 0f, +500);
-				gl.glVertex3f(-500, 50f, +500);
-				gl.glVertex3f(-500, 50f, +550f);
-				gl.glVertex3f(-500, 0f, +550f);
-				// face lateral direita
-				gl.glVertex3f(+500, 0f, +500);
-				gl.glVertex3f(+500, 50f, +500);
-				gl.glVertex3f(+500, 50f, +550f);
-				gl.glVertex3f(+500, 0f, +550f);
-		
-				/**
-				 * Segundo MURO
-				 */
-				gl.glVertex3f(-500, 0f, -500);
-				gl.glVertex3f(-500, 0f, -550f);
-				gl.glVertex3f(+500, 0f, -550f);
-				gl.glVertex3f(+500, 0f, -500);
-				// face de cima
-				gl.glVertex3f(-500, 50f, -500);
-				gl.glVertex3f(-500, 50f, -550f);
-				gl.glVertex3f(+500, 50f, -550f);
-				gl.glVertex3f(+500, 50f, -500);
-				// face da frente
-				gl.glVertex3f(-500, 0f, -500);
-				gl.glVertex3f(-500, 50f, -500);
-				gl.glVertex3f(+500, 50f, -500);
-				gl.glVertex3f(+500, 0f, -500);
-				// face da traz
-				gl.glVertex3f(-500, 0f, -550f);
-				gl.glVertex3f(-500, 50f, -550f);
-				gl.glVertex3f(+500, 50f, -550f);
-				gl.glVertex3f(+500, 0f, -550f);
-				// face lateral esquerda
-				gl.glVertex3f(-500, 0f, -500);
-				gl.glVertex3f(-500, 50f, -500);
-				gl.glVertex3f(-500, 50f, -550f);
-				gl.glVertex3f(-500, 0f, -550f);
-				// face lateral direita
-				gl.glVertex3f(+500, 0f, -500);
-				gl.glVertex3f(+500, 50f, -500);
-				gl.glVertex3f(+500, 50f, -550f);
-				gl.glVertex3f(+500, 0f, -550f);
-	
-			/**
-			 * Terceiro Muro
-			 */
-				gl.glVertex3f(-500, 0f, +500);
-				gl.glVertex3f(-550f, 0f, -500);
-				gl.glVertex3f(-550f, 0f, +500);
-				gl.glVertex3f(-500, 0f, -500);
-				// face de cima
-				gl.glVertex3f(-500, 50f, -500);
-				gl.glVertex3f(-500, 50f, -550f);
-				gl.glVertex3f(+500, 50f, -550f);
-				gl.glVertex3f(+500, 50f, -500);
-				// face da frente
-				gl.glVertex3f(-500, 0f, +500);
-				gl.glVertex3f(-500, 50f, +500);
-				gl.glVertex3f(-500, 50f,-500);
-				gl.glVertex3f(-500, 0f, -500);
-				// face da traz
-				gl.glVertex3f(-550f, 0f, +500);
-				gl.glVertex3f(-550f, 50f,+500);
-				gl.glVertex3f(-550f, 50f,-500);
-				gl.glVertex3f(-550f, 0f, -500);
-				// face lateral esquerda
-				gl.glVertex3f(-500, 0f, +500);
-				gl.glVertex3f(-500, 50f,+500);
-				gl.glVertex3f(-550f, 50f,-500);
-				gl.glVertex3f(-550f, 0f, -500);
-				// face lateral direita
-				gl.glVertex3f(-500, 0f, -500);
-				gl.glVertex3f(-500, 50f,-500);
-				gl.glVertex3f(-550f, 50f,-500);
-				gl.glVertex3f(-550f, 0f, -500);
-				
-				/**
-				 * Quarto Muro
-				 */
-				gl.glVertex3f(+500, 0f, +500);
-				gl.glVertex3f(+550f, 0f, +500);
-				gl.glVertex3f(+550f, 0f, -500);
-				gl.glVertex3f(+500, 0f, -500);
-				// face de cima
-				gl.glVertex3f(+500, 50f, +500);
-				gl.glVertex3f(+550f, 50f, +500);
-				gl.glVertex3f(+550f, 50f, -500);
-				gl.glVertex3f(+500, 50f, -500);
-				// face da frente
-				gl.glVertex3f(+500, 0f, +500);
-				gl.glVertex3f(+500, 50f,+500);
-				gl.glVertex3f(+500, 50f,-500);
-				gl.glVertex3f(+500, 0f, -500);
-				// face da traz
-				gl.glVertex3f(+550f, 0f, +500);
-				gl.glVertex3f(+550f, 50f,+500);
-				gl.glVertex3f(+550f, 50f,-500);
-				gl.glVertex3f(+550f, 0f, -500);
-				// face lateral esquerda
-				gl.glVertex3f(+500, 0f, -500);
-				gl.glVertex3f(+500, 50f,-500);
-				gl.glVertex3f(+550f, 50f,-500);
-				gl.glVertex3f(+550f, 0f, -500);
-				// face lateral direita
-				gl.glVertex3f(+500, 0f, +500);
-				gl.glVertex3f(+500, 50f,+500);
-				gl.glVertex3f(+550f, 50f,+500);
-				gl.glVertex3f(+550f, 0f, +500);
-				
-				
-			gl.glEnd();
-		gl.glPopMatrix();
-		gl.glDisable(GL.GL_TEXTURE_2D);	//	Desabilita uso de textura
-		// gl.glColor3f(0.0f, 1.0f, 0.0f);
-		// gl.glPushMatrix();
-		// gl.glBegin(GL.GL_QUADS );
-		// gl.glEnd();
-		// gl.glPopMatrix();
+	gl.glDisable(GL.GL_CULL_FACE);
+	{
+	    float[] cor = { 0, 1, 0, 1f };
+	    gl.glMaterialfv(GL.GL_FRONT, GL.GL_AMBIENT_AND_DIFFUSE, cor, 0);
+	    // Desenha um cubo no qual a textura é aplicada
+	    //	    gl.glEnable(GL.GL_TEXTURE_2D); // Primeiro habilita uso de textura
+	    //	    {
+	    //		gl.glColor3f(0.0f, 1.0f, 0.0f);
+	    gl.glPushMatrix();
+	    {
+		gl.glBegin(GL.GL_QUADS);
+		{
+		    gl.glVertex3f(-500, 0f, +500);
+		    gl.glVertex3f(-500, 0f, +550f);
+		    gl.glVertex3f(+500, 0f, +550f);
+		    gl.glVertex3f(+500, 0f, +500);
+		    // face de cima
+		    gl.glVertex3f(-500, 50f, +500);
+		    gl.glVertex3f(-500, 50f, +550f);
+		    gl.glVertex3f(+500, 50f, +550f);
+		    gl.glVertex3f(+500, 50f, +500);
+		    // face da frente
+		    gl.glVertex3f(-500, 0f, +500);
+		    gl.glVertex3f(-500, 50f, +500);
+		    gl.glVertex3f(+500, 50f, +500);
+		    gl.glVertex3f(+500, 0f, +500);
+		    // face da traz
+		    gl.glVertex3f(-500, 0f, +550f);
+		    gl.glVertex3f(-500, 50f, +550f);
+		    gl.glVertex3f(+500, 50f, +550f);
+		    gl.glVertex3f(+500, 0f, +550f);
+		    // face lateral esquerda
+		    gl.glVertex3f(-500, 0f, +500);
+		    gl.glVertex3f(-500, 50f, +500);
+		    gl.glVertex3f(-500, 50f, +550f);
+		    gl.glVertex3f(-500, 0f, +550f);
+		    // face lateral direita
+		    gl.glVertex3f(+500, 0f, +500);
+		    gl.glVertex3f(+500, 50f, +500);
+		    gl.glVertex3f(+500, 50f, +550f);
+		    gl.glVertex3f(+500, 0f, +550f);
+		}
+		gl.glEnd();
+		gl.glBegin(GL.GL_QUADS);
+		{
+		    /**
+		     * Segundo MURO
+		     */
+		    gl.glVertex3f(-500, 0f, -500);
+		    gl.glVertex3f(-500, 0f, -550f);
+		    gl.glVertex3f(+500, 0f, -550f);
+		    gl.glVertex3f(+500, 0f, -500);
+		    // face de cima
+		    gl.glVertex3f(-500, 50f, -500);
+		    gl.glVertex3f(-500, 50f, -550f);
+		    gl.glVertex3f(+500, 50f, -550f);
+		    gl.glVertex3f(+500, 50f, -500);
+		    // face da frente
+		    gl.glVertex3f(-500, 0f, -500);
+		    gl.glVertex3f(-500, 50f, -500);
+		    gl.glVertex3f(+500, 50f, -500);
+		    gl.glVertex3f(+500, 0f, -500);
+		    // face da traz
+		    gl.glVertex3f(-500, 0f, -550f);
+		    gl.glVertex3f(-500, 50f, -550f);
+		    gl.glVertex3f(+500, 50f, -550f);
+		    gl.glVertex3f(+500, 0f, -550f);
+		    // face lateral esquerda
+		    gl.glVertex3f(-500, 0f, -500);
+		    gl.glVertex3f(-500, 50f, -500);
+		    gl.glVertex3f(-500, 50f, -550f);
+		    gl.glVertex3f(-500, 0f, -550f);
+		    // face lateral direita
+		    gl.glVertex3f(+500, 0f, -500);
+		    gl.glVertex3f(+500, 50f, -500);
+		    gl.glVertex3f(+500, 50f, -550f);
+		    gl.glVertex3f(+500, 0f, -550f);
+		}
+		gl.glEnd();
+		gl.glBegin(GL.GL_QUADS);
+		{
+		    /**
+		     * Terceiro Muro
+		     */
+		    gl.glVertex3f(-500, 0f, +500);
+		    gl.glVertex3f(-550f, 0f, -500);
+		    gl.glVertex3f(-550f, 0f, +500);
+		    gl.glVertex3f(-500, 0f, -500);
+		    // face de cima
+		    gl.glVertex3f(-500, 50f, -500);
+		    gl.glVertex3f(-500, 50f, -550f);
+		    gl.glVertex3f(+500, 50f, -550f);
+		    gl.glVertex3f(+500, 50f, -500);
+		    // face da frente
+		    gl.glVertex3f(-500, 0f, +500);
+		    gl.glVertex3f(-500, 50f, +500);
+		    gl.glVertex3f(-500, 50f, -500);
+		    gl.glVertex3f(-500, 0f, -500);
+		    // face da traz
+		    gl.glVertex3f(-550f, 0f, +500);
+		    gl.glVertex3f(-550f, 50f, +500);
+		    gl.glVertex3f(-550f, 50f, -500);
+		    gl.glVertex3f(-550f, 0f, -500);
+		    // face lateral esquerda
+		    gl.glVertex3f(-500, 0f, +500);
+		    gl.glVertex3f(-500, 50f, +500);
+		    gl.glVertex3f(-550f, 50f, -500);
+		    gl.glVertex3f(-550f, 0f, -500);
+		    // face lateral direita
+		    gl.glVertex3f(-500, 0f, -500);
+		    gl.glVertex3f(-500, 50f, -500);
+		    gl.glVertex3f(-550f, 50f, -500);
+		    gl.glVertex3f(-550f, 0f, -500);
+		}
+		gl.glEnd();
+		gl.glBegin(GL.GL_QUADS);
+		{
+		    /**
+		     * Quarto Muro
+		     */
+		    gl.glVertex3f(+500, 0f, +500);
+		    gl.glVertex3f(+550f, 0f, +500);
+		    gl.glVertex3f(+550f, 0f, -500);
+		    gl.glVertex3f(+500, 0f, -500);
+		    // face de cima
+		    gl.glVertex3f(+500, 50f, +500);
+		    gl.glVertex3f(+550f, 50f, +500);
+		    gl.glVertex3f(+550f, 50f, -500);
+		    gl.glVertex3f(+500, 50f, -500);
+		    // face da frente
+		    gl.glVertex3f(+500, 0f, +500);
+		    gl.glVertex3f(+500, 50f, +500);
+		    gl.glVertex3f(+500, 50f, -500);
+		    gl.glVertex3f(+500, 0f, -500);
+		    // face da traz
+		    gl.glVertex3f(+550f, 0f, +500);
+		    gl.glVertex3f(+550f, 50f, +500);
+		    gl.glVertex3f(+550f, 50f, -500);
+		    gl.glVertex3f(+550f, 0f, -500);
+		    // face lateral esquerda
+		    gl.glVertex3f(+500, 0f, -500);
+		    gl.glVertex3f(+500, 50f, -500);
+		    gl.glVertex3f(+550f, 50f, -500);
+		    gl.glVertex3f(+550f, 0f, -500);
+		    // face lateral direita
+		    gl.glVertex3f(+500, 0f, +500);
+		    gl.glVertex3f(+500, 50f, +500);
+		    gl.glVertex3f(+550f, 50f, +500);
+		    gl.glVertex3f(+550f, 0f, +500);
+
+		}
+		gl.glEnd();
+	    }
+	    gl.glPopMatrix();
+	    //	    }
+	    //	    gl.glDisable(GL.GL_TEXTURE_2D); //	Desabilita uso de textura
+	    // gl.glColor3f(0.0f, 1.0f, 0.0f);
+	    // gl.glPushMatrix();
+	    // gl.glBegin(GL.GL_QUADS );
+	    // gl.glEnd();
+	    // gl.glPopMatrix();
 	}
+	gl.glEnable(GL.GL_CULL_FACE);
+    }
 
     private void alterarEstadoJogo(EstadoJogo novoEstado) {
 	this.estadoJogo = novoEstado;
@@ -565,10 +583,10 @@ public class Tela extends GLCanvas implements GLEventAdapter {
      * Desenha os eixos do Sistema de ReferÃªncia Universal
      */
     public static void desenhaSRU(GL gl) {
-//	gl.glEnable(GL.GL_COLOR_MATERIAL);
-	
+	//	gl.glEnable(GL.GL_COLOR_MATERIAL);
+
 	gl.glDisable(GL.GL_LIGHTING);
-	
+
 	gl.glLineWidth(1.0f);
 
 	// eixo x
@@ -597,9 +615,13 @@ public class Tela extends GLCanvas implements GLEventAdapter {
 	    gl.glVertex3f(0f, 0f, 200f);
 	}
 	gl.glEnd();
-	
+
 	gl.glEnable(GL.GL_LIGHTING);
-//	gl.glDisable(GL.GL_COLOR_MATERIAL);
+	//		gl.glDisable(GL.GL_COLOR_MATERIAL);
     }
 
+    public String getMapa() {
+	//TODO Implementar
+	return null;
+    }
 }

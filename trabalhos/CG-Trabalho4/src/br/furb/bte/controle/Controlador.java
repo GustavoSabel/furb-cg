@@ -20,6 +20,10 @@ public abstract class Controlador implements GameplayListener {
     public abstract void associarTela(Tela tela);
 
     @Override
+    public void beforePlay() {
+    }
+    
+    @Override
     public void afterInit() {
     }
     

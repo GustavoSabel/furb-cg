@@ -17,6 +17,7 @@ import javax.swing.WindowConstants;
 import javax.swing.border.TitledBorder;
 import br.furb.bte.controle.Controlador;
 import br.furb.bte.controle.ControladorLocal;
+import br.furb.bte.controle.ia.ControladorIA;
 import br.furb.bte.ui.UIUtils.SupportedLookAndFeel;
 
 @SuppressWarnings("serial")
@@ -28,6 +29,8 @@ public class Launcher extends JFrame {
     private final DialogoComandos dialogoComandos;
     private JButton btnLocal;
     private JButton btnComandos;
+    private JButton btnLocalIA;
+    
 
     /**
      * Launch the application.
@@ -71,6 +74,10 @@ public class Launcher extends JFrame {
 	btnComandos.addActionListener(event -> {
 	    dialogoComandos.setVisible(true);
 	});
+	
+	btnLocalIA.addActionListener(event -> {
+	    launch(new ControladorIA());
+	});
     }
 
     @Override
@@ -110,7 +117,7 @@ public class Launcher extends JFrame {
 	gbl_panelCenter.rowWeights = new double[] { 1.0, 1.0, 0.0, 1.0, 0.0, Double.MIN_VALUE };
 	panelCenter.setLayout(gbl_panelCenter);
 	{
-	    btnLocal = new JButton("Local");
+	    btnLocal = new JButton("Multiplayer");
 	    btnLocal.setFont(FONT_HIGH);
 	    btnLocal.setBackground(Color.GRAY);
 	    GridBagConstraints gbc_btnLocal = new GridBagConstraints();
@@ -122,6 +129,18 @@ public class Launcher extends JFrame {
 	    panelCenter.add(btnLocal, gbc_btnLocal);
 	}
 	{
+	    btnLocalIA = new JButton("Singleplayer");
+	    btnLocalIA.setFont(FONT_HIGH);
+	    btnLocalIA.setBackground(Color.GRAY);
+	    GridBagConstraints gbc_btnRede = new GridBagConstraints();
+	    gbc_btnRede.gridheight = 2;
+	    gbc_btnRede.fill = GridBagConstraints.BOTH;
+	    gbc_btnRede.insets = new Insets(0, 0, 5, 5);
+	    gbc_btnRede.gridx = 2;
+	    gbc_btnRede.gridy = 1;
+	    panelCenter.add(btnLocalIA, gbc_btnRede);
+	}
+	{
 	    btnRede = new JButton("Rede");
 	    btnRede.setFont(FONT_HIGH);
 	    btnRede.setBackground(Color.GRAY);
@@ -129,7 +148,7 @@ public class Launcher extends JFrame {
 	    gbc_btnRede.gridheight = 2;
 	    gbc_btnRede.fill = GridBagConstraints.BOTH;
 	    gbc_btnRede.insets = new Insets(0, 0, 5, 5);
-	    gbc_btnRede.gridx = 2;
+	    gbc_btnRede.gridx = 3;
 	    gbc_btnRede.gridy = 1;
 	    panelCenter.add(btnRede, gbc_btnRede);
 	}
